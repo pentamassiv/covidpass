@@ -2,7 +2,7 @@ use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
 use gtk4 as gtk;
 use gtk4::Button;
-use qrcode::render::unicode;
+use image::Luma;
 use qrcode::{EcLevel, QrCode};
 use std::{error::Error, fs::read_to_string};
 
@@ -23,16 +23,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let code = QrCode::with_error_correction_level(_buf_str, EcLevel::L).unwrap();
 
-    let image = code
-        .render::<unicode::Dense1x2>()
-        .dark_color(unicode::Dense1x2::Light)
-        .light_color(unicode::Dense1x2::Dark)
-        .build();
-    println!("{}", image);
+    let image = code.render::<Luma<u8>>().build();
+
+    // Save the image.
+    image.save("/tmp/qrcode.png").unwrap();
 
     // Create a new application
     let app = Application::builder()
-        .application_id("org.covidcert")
+        .application_id("org.covidpass")
         .build();
 
     // Connect to "activate" signal of `app`
@@ -45,28 +43,52 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn build_ui(app: &Application) {
+    let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
+
     // Create a button with label and margins
     let button = Button::builder()
-        .label("Press me!")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .label("+")
+        .margin_top(4)
+        .margin_bottom(4)
+        .margin_start(4)
+        .margin_end(4)
         .build();
 
-    // Connect to "clicked" signal of `button`
-    button.connect_clicked(move |button| {
-        // Set the label to "Hello World!" after the button has been clicked on
-        button.set_label("Hello World!");
-    });
+    /*let file_chooser = gtk::FileChooserNative::new(
+        None,                         // file
+        Some(&gtk::Window::new()),    // parent
+        gtk::FileChooserAction::Open, // action
+        None,                         // accept_label
+        None,                         // cancel_label
+    );
+    let filename = file_chooser.file().unwrap().basename();
+    file_chooser.show();*/
+
+    vbox.append(&button);
 
     // Create a window
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("Covid Certificate")
-        .child(&button)
+        .title("Covidpass")
+        .child(&vbox)
         .build();
+
+    // Connect to "clicked" signal of `button`
+    button.connect_clicked(move |_| {
+        add_certificate(&vbox);
+    });
 
     // Present window
     window.present();
+}
+
+fn add_certificate(vbox: &gtk::Box) {
+    let qr_png = gtk::Image::from_file("/tmp/qrcode.png");
+    qr_png.set_vexpand(true);
+    qr_png.set_hexpand(true);
+    qr_png.set_margin_top(4);
+    qr_png.set_margin_bottom(4);
+    qr_png.set_margin_start(4);
+    qr_png.set_margin_end(4);
+    vbox.prepend(&qr_png);
 }
