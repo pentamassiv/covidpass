@@ -10,6 +10,7 @@ greenpass = { path = "../greenpass", package = "greenpass"}
 greenpass_crates = { version = "0.1.0", package = "greenpass"}
 qrcode = "0.12"
 image = "0.23"
+libadwaita = "0.1.0"
 gtk4 = "0.4"
 
 [features]
