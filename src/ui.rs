@@ -90,7 +90,8 @@ fn handle_file_chooser_response(
     if response == gtk::ResponseType::Accept {
         if let Some(file) = file_chooser.file() {
             if let Some(path) = file.path() {
-                if let Ok((first_name, full_name, cert)) = cert::load_certificate(&path) {
+                if let Ok(((first_name, surname, full_name), cert)) = cert::load_certificate(&path)
+                {
                     add_qr_png(&first_name, &full_name, &leaflet);
                     throw_toast(ToastType::Success(first_name), toast_overlay);
                 } else {
