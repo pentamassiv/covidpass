@@ -28,7 +28,7 @@ jobs:
     - name: Get Rust
       run: curl https://sh.rustup.rs -sSf | bash -s -- -y
     - name: Set path for cargo
-    - run: echo "/root/.cargo/bin" >> $GITHUB_PATH
+      run: echo "/root/.cargo/bin" >> $GITHUB_PATH
     - name: Build
       run: cargo build --verbose
     - name: Run tests
