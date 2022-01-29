@@ -1,5 +1,6 @@
 use super::*;
 
+pub mod detail_page;
 pub mod start_page;
 
 pub fn build_ui(app: &Application) {
@@ -26,10 +27,16 @@ pub fn build_ui(app: &Application) {
     let header_bar = HeaderBar::builder()
         .title_widget(&adw::WindowTitle::new("Covidpass", ""))
         .build();
-
     let toast_overlay = adw::ToastOverlay::new();
-    let start_page = start_page::StartPage::new(toast_overlay.clone());
-    toast_overlay.set_child(Some(&start_page.content));
+
+    let view_stack = adw::ViewStack::new();
+    let start_page = start_page::StartPage::new(&view_stack, toast_overlay.clone());
+    let detail_page = detail_page::DetailPage::new(&view_stack, toast_overlay.clone());
+
+    let view_stack_page_start = view_stack.add_named(start_page.content(), Some("start_page"));
+    let view_stack_page_detail = view_stack.add_named(detail_page.content(), Some("detail_page"));
+
+    toast_overlay.set_child(Some(&view_stack));
 
     // Combine the content in a box
     let vbox = gtk::Box::new(Orientation::Vertical, 0);

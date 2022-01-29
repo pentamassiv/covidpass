@@ -11,7 +11,7 @@ mod pub_keys;
 mod ui;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    pub_keys::fetch_public_keys();
+    // pub_keys::fetch_public_keys();
 
     // Create a new application
     let app = Application::builder()

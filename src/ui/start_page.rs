@@ -1,16 +1,16 @@
 use super::*;
 
 pub struct StartPage {
-    persons: usize,
-    pub content: gtk::Box,
+    content: gtk::Box,
     leaflet: adw::Leaflet,
     button: gtk::Button,
     toast_overlay: adw::ToastOverlay,
     file_chooser: gtk::FileChooserNative,
+    view_stack: adw::ViewStack,
 }
 
 impl StartPage {
-    pub fn new(toast_overlay: adw::ToastOverlay) -> Self {
+    pub fn new(view_stack: &adw::ViewStack, toast_overlay: adw::ToastOverlay) -> Self {
         let leaflet = adw::Leaflet::new();
 
         let button = Button::builder()
@@ -36,11 +36,11 @@ impl StartPage {
 
         let start_page = Self {
             content,
-            persons: 0,
             leaflet: leaflet.clone(),
             button: button.clone(),
             toast_overlay: toast_overlay.clone(),
             file_chooser: file_chooser.clone(),
+            view_stack: view_stack.clone(),
         };
         start_page.connect();
         start_page
@@ -51,10 +51,17 @@ impl StartPage {
         let toast_overlay = self.toast_overlay.clone();
         let button = self.button.clone();
         let file_chooser = self.file_chooser.clone();
+        let view_stack = self.view_stack.clone();
 
         // Connect to response of the file chooser
         file_chooser.connect_response(move |file_chooser, response| {
-            handle_file_chooser_response(file_chooser, response, &leaflet, &toast_overlay);
+            handle_file_chooser_response(
+                file_chooser,
+                response,
+                &leaflet,
+                &toast_overlay,
+                &view_stack,
+            );
             file_chooser.hide();
         });
 
@@ -63,6 +70,10 @@ impl StartPage {
             file_chooser.show();
         });
     }
+
+    pub fn content(&self) -> &gtk::Box {
+        &self.content
+    }
 }
 
 fn handle_file_chooser_response(
@@ -70,13 +81,14 @@ fn handle_file_chooser_response(
     response: gtk::ResponseType,
     leaflet: &adw::Leaflet,
     toast_overlay: &adw::ToastOverlay,
+    view_stack: &adw::ViewStack,
 ) {
     if response == gtk::ResponseType::Accept {
         if let Some(file) = file_chooser.file() {
             if let Some(path) = file.path() {
                 if let Ok(((first_name, surname, full_name), cert)) = cert::load_certificate(&path)
                 {
-                    add_qr_png(&first_name, &full_name, &leaflet);
+                    add_qr_png(&first_name, &full_name, &leaflet, view_stack);
                     throw_toast(ToastType::Success(first_name), &toast_overlay);
                 } else {
                     throw_toast(ToastType::CertInvalid, &toast_overlay);
@@ -92,7 +104,12 @@ fn handle_file_chooser_response(
     }
 }
 
-fn add_qr_png(givenname: &str, full_name: &str, leaflet: &adw::Leaflet) {
+fn add_qr_png(
+    givenname: &str,
+    full_name: &str,
+    leaflet: &adw::Leaflet,
+    view_stack: &adw::ViewStack,
+) {
     let qr_png = Image::from_file("/tmp/qrcode.png");
     qr_png.set_vexpand(true);
     qr_png.set_hexpand(true);
@@ -115,5 +132,20 @@ fn add_qr_png(givenname: &str, full_name: &str, leaflet: &adw::Leaflet) {
     vbox_cert.append(&qr_png);
     vbox_cert.append(&squeezer);
 
-    leaflet.append(&vbox_cert);
+    let button_qr = gtk::Button::new();
+    button_qr.set_child(Some(&vbox_cert));
+
+    leaflet.append(&button_qr);
+
+    // Connect to "clicked" signal of `button`
+    let view_stack = view_stack.clone();
+    let givenname_clone: String = givenname.into();
+    button_qr.connect_clicked(move |_| {
+        println!("Pushed qr for {}", givenname_clone);
+        println!(
+            "Currently visible: {}",
+            view_stack.visible_child_name().unwrap()
+        );
+        view_stack.set_visible_child_name("detail_page");
+    });
 }
