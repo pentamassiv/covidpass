@@ -27,9 +27,9 @@ jobs:
       run: apt-get -y install libgtk-4-dev libadwaita-1-0
     - name: Get Rust
       run: curl https://sh.rustup.rs -sSf | bash -s -- -y
-    - name: Set environment variable so cargo can be used
-      env: PATH="/root/.cargo/bin:${PATH}"
     - name: Build
+      env: PATH="/root/.cargo/bin:${PATH}"
       run: cargo build --verbose
     - name: Run tests
+      env: PATH="/root/.cargo/bin:${PATH}"
       run: cargo test --verbose
