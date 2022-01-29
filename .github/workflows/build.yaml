@@ -8,9 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-
-jobs:
-
+ 
 jobs:
   build:
     name: ubuntu 21.04
