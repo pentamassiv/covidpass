@@ -11,16 +11,16 @@ env:
  
 jobs:
   build:
-    name: ubuntu 21.04
+    name: ubuntu 22.04
     runs-on: ubuntu-20.04
-    container: ubuntu:21.04
+    container: ubuntu:22.04
 
     steps:
     - uses: actions/checkout@v2.4.0
     - name: Update repositories
       run: apt-get update
     - name: Install GTK libraries
-      run: apt-get install libgtk-4-dev
+      run: apt-get -y install libgtk-4-dev libadwaita-1-0
     - name: Build
       run: cargo build --verbose
     - name: Run tests
