@@ -18,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2.4.0
     - name: Set timezone
-      run: RUN ln -snf /usr/share/zoneinfo/$CONTAINER_TIMEZONE /etc/localtime && echo $CONTAINER_TIMEZONE > /etc/timezone
+      run: ln -snf /usr/share/zoneinfo/$CONTAINER_TIMEZONE /etc/localtime && echo $CONTAINER_TIMEZONE > /etc/timezone
     - name: Update repositories
       run: apt-get update
     - name: Install GTK libraries
