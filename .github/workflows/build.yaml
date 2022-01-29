@@ -22,7 +22,7 @@ jobs:
     - name: Update repositories
       run: apt-get update
     - name: Install GCC & curl & openssl
-      run: apt-get install -y build-essential gcc curl openssl libssl-dev
+      run: apt-get install -y build-essential gcc pkgconf fakeroot curl openssl libssl-dev
     - name: Install GTK libraries
       run: apt-get -y install libgtk-4-dev libadwaita-1-dev
     - name: Get Rust
