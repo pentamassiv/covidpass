@@ -21,8 +21,8 @@ jobs:
       run: ln -snf /usr/share/zoneinfo/$CONTAINER_TIMEZONE /etc/localtime && echo $CONTAINER_TIMEZONE > /etc/timezone
     - name: Update repositories
       run: apt-get update
-    - name: Install curl
-      run: apt-get install -y build-essential curl
+    - name: Install curl & openssl
+      run: apt-get install -y build-essential curl openssl
     - name: Install GTK libraries
       run: apt-get -y install libgtk-4-dev libadwaita-1-0
     - name: Get Rust
