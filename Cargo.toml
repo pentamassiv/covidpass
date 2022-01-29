@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 dgc = "0.0"
 qrcode = "0.12"
-image = "0.23"
+image = "0.23.12"
 libadwaita = "0.1"
 gtk4 = "0.4"
 curl = "0.4"
