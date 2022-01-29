@@ -2,15 +2,17 @@ use gtk4 as gtk;
 use libadwaita as adw;
 
 use adw::prelude::*;
-use adw::{ActionRow, ApplicationWindow, HeaderBar};
-use gtk::{Application, Button, Image, ListBox, Orientation};
-use qrcode::{EcLevel, QrCode};
-use std::{error::Error, fs::read_to_string};
+use adw::{ApplicationWindow, HeaderBar};
+use gtk::{Application, Button, Image, Orientation};
+use std::error::Error;
 
 mod cert;
+mod pub_keys;
 mod ui;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    pub_keys::fetch_public_keys();
+
     // Create a new application
     let app = Application::builder()
         .application_id("org.covidpass")

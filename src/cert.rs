@@ -1,5 +1,5 @@
-use super::*;
-use dgc::*;
+use qrcode::{EcLevel, QrCode};
+use std::{error::Error, fs::read_to_string};
 
 pub fn load_certificate(
     cert_path: &std::path::Path,
