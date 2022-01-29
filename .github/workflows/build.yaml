@@ -15,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2.4.0
+    - name: Install GTK libraries
+      run: sudo apt-get install libgtk-4-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
