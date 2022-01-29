@@ -17,8 +17,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2.4.0
+    - name: Update repositories
+      run: apt-get update
     - name: Install GTK libraries
-      run: su apt-get install libgtk-4-dev
+      run: apt-get install libgtk-4-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
