@@ -28,7 +28,7 @@ jobs:
     - name: Get Rust
       run: curl https://sh.rustup.rs -sSf | bash -s -- -y
     - name: Set environment variable so cargo can be used
-      run: echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+      env: PATH="/root/.cargo/bin:${PATH}"
     - name: Build
       run: cargo build --verbose
     - name: Run tests
