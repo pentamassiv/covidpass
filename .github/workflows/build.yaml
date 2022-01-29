@@ -32,5 +32,4 @@ jobs:
     - name: Build
       run: cargo build --verbose
     - name: Run tests
-      env: PATH="/root/.cargo/bin:${PATH}"
       run: cargo test --verbose
