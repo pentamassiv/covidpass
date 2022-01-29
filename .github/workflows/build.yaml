@@ -26,8 +26,8 @@ jobs:
     - name: Install GTK libraries
       run: apt-get -y install libgtk-4-dev libadwaita-1-0
     - name: Get Rust
-      run: curl https://sh.rustup.rs -sSf | bash -s -- -y
+      run: apt-get -y install cargo
     - name: Build
-      run: bash -c 'source ~/.cargo/env; cargo build --verbose
+      run: cargo build --verbose
     - name: Run tests
-      run: bash -c 'source ~/.cargo/env; cargo test --verbose
+      run: cargo test --verbose
