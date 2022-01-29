@@ -24,7 +24,7 @@ jobs:
     - name: Install curl & openssl
       run: apt-get install -y build-essential curl openssl libssl-dev
     - name: Install GTK libraries
-      run: apt-get -y install libgtk-4-dev libadwaita-1-0
+      run: apt-get -y install libgtk-4-dev libadwaita-1-dev
     - name: Get Rust
       run: apt-get -y install cargo
     - name: Build
