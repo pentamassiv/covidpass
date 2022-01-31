@@ -10,6 +10,14 @@ mod cert;
 mod pub_keys;
 mod ui;
 
+/*
+
+    calendar_entries: FactoryVec<CertificateEntry>,
+    certificates: HashMap<(String, String, String), DgcContainer>,
+    trust_list: dgc::TrustList,
+
+*/
+
 fn main() -> Result<(), Box<dyn Error>> {
     // pub_keys::fetch_public_keys();
 
