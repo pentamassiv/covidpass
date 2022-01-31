@@ -1,7 +1,7 @@
 use super::*;
-
 #[derive(Clone)]
-pub struct StartPage {
+pub struct StartPage<'a> {
+    certificate_store: &'a cert::CertificateStore,
     content: gtk::Box,
     leaflet: adw::Leaflet,
     button: gtk::Button,
@@ -10,8 +10,12 @@ pub struct StartPage {
     view_stack: adw::ViewStack,
 }
 
-impl StartPage {
-    pub fn new(view_stack: &adw::ViewStack, toast_overlay: adw::ToastOverlay) -> Self {
+impl<'a> StartPage<'a> {
+    pub fn new(
+        view_stack: &adw::ViewStack,
+        certificate_store: &cert::CertificateStore,
+        toast_overlay: adw::ToastOverlay,
+    ) -> Self {
         let leaflet = adw::Leaflet::new();
 
         let button = Button::builder()
@@ -36,6 +40,7 @@ impl StartPage {
         );
 
         let start_page = Self {
+            certificate_store,
             content,
             leaflet: leaflet.clone(),
             button: button.clone(),
@@ -72,7 +77,7 @@ impl StartPage {
             if let Some(file) = self.file_chooser.file() {
                 if let Some(path) = file.path() {
                     if let Ok(((first_name, surname, full_name), cert)) =
-                        cert::load_certificate(&path)
+                        self.certificate_store.add_certificate(&path)
                     {
                         self.add_qr_png(&first_name, &full_name);
                         throw_toast(ToastType::Success(first_name), &self.toast_overlay);

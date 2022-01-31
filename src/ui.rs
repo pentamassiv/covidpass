@@ -23,6 +23,8 @@ pub fn build_ui(app: &Application) {
         .build();
     list.append(&row);*/
 
+    let certificate_store = cert::CertificateStore::new();
+
     // Adwaitas' ApplicationWindow does not include a HeaderBar
     let header_bar = HeaderBar::builder()
         .title_widget(&adw::WindowTitle::new("Covidpass", ""))
@@ -30,7 +32,8 @@ pub fn build_ui(app: &Application) {
     let toast_overlay = adw::ToastOverlay::new();
 
     let view_stack = adw::ViewStack::new();
-    let start_page = start_page::StartPage::new(&view_stack, toast_overlay.clone());
+    let start_page =
+        start_page::StartPage::new(&view_stack, &certificate_store, toast_overlay.clone());
     let detail_page = detail_page::DetailPage::new(&view_stack, toast_overlay.clone());
 
     let view_stack_page_start = view_stack.add_named(start_page.content(), Some("start_page"));
