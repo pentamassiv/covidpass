@@ -35,7 +35,7 @@ struct CertificateEntry {
 
 #[derive(Debug)]
 struct CertificateWidgets {
-    root: gtk::Stack,
+    root: adw::Leaflet,
     active: gtk::Box,
     waiting: gtk::CenterBox,
     waiting_label: gtk::Label,
@@ -56,17 +56,13 @@ impl CertificateWidgets {
 impl FactoryPrototype for CertificateEntry {
     type Factory = FactoryVec<CertificateEntry>;
     type Widgets = CertificateWidgets;
-    type Root = gtk::Stack;
-    type View = gtk::Stack;
+    type Root = adw::Leaflet;
+    type View = adw::Leaflet;
     type Msg = AppMsg;
 
     fn init_view(&self, _key: &usize, _sender: Sender<AppMsg>) -> Self::Widgets {
         // Create widgets.
-        let root = gtk::Stack::builder()
-            .vexpand(true)
-            .transition_type(gtk::StackTransitionType::RotateLeftRight)
-            .transition_duration(700)
-            .build();
+        let root = adw::Leaflet::new();
 
         let active = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -96,8 +92,8 @@ impl FactoryPrototype for CertificateEntry {
 
         waiting.set_center_widget(Some(&waiting_label));
 
-        root.add_child(&active);
-        root.add_child(&waiting);
+        root.append(&active);
+        root.append(&waiting);
 
         let widgets = CertificateWidgets {
             root,
@@ -110,12 +106,7 @@ impl FactoryPrototype for CertificateEntry {
         widgets
     }
 
-    fn position(&self, key: &usize) -> StackPageInfo {
-        StackPageInfo {
-            name: Some(key.to_string()),
-            title: Some(format!("Day {}", key + 1)),
-        }
-    }
+    fn position(&self, key: &usize) -> () {}
 
     fn view(&self, _key: &usize, widgets: &CertificateWidgets) {
         widgets.update(self.time_left);
@@ -259,10 +250,8 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     set_child: view_stack = Some(&adw::ViewStack) {
                         add_named(Some("start_page")) = &gtk::Box {
                             set_orientation: gtk::Orientation::Vertical,
-                            append: leaflet = &adw::Leaflet {
-                                append: main_view = &gtk::Stack {
+                            append: main_view = &adw::Leaflet {
                                 factory!(model.calendar_entries)
-                                },
                             },
                             append = &gtk::Button {
                                 set_label: "+",
@@ -338,7 +327,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                 });
         */
 
-        main_view.set_visible_child_name(&model.start_page.to_string());
+        //main_view.set_visible_child_name(&model.start_page.to_string());
 
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(1));
