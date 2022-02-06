@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 dgc = "0.0"
-qrcode = "0.12"
-image = "0.23.14"
-# Github version is needed for the fixed "clear" function of the Factory
-relm4 = { git = "https://github.com/AaronErhardt/relm4", features = ["libadwaita", "macros"] }
+qrcodegen = "1.7.0"
+image = "0.24"
+relm4 = { version = "0.4.2", features = ["libadwaita", "macros"] }
 relm4-components = "0.4.0"
 relm4-macros = "0.4.1"
 libadwaita = "0.1"
 gtk4 = "0.4"
+gio = "0.15"
 curl = "0.4"

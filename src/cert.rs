@@ -1,5 +1,4 @@
 use dgc::DgcContainer;
-use qrcode::{EcLevel, QrCode};
 use std::collections::HashMap;
 use std::{error::Error, fs::read_to_string};
 
@@ -31,6 +30,7 @@ impl CertificateStore {
         Ok(())
     }
 
+    /*
     pub fn add_certificate(
         &self,
         cert_path: &std::path::Path,
@@ -62,11 +62,11 @@ impl CertificateStore {
 
         Self::generate_qr_code(&raw_certificate_data)?;
         Ok(((forename, surname, full_name), certificate_container))
-    }
-    fn generate_qr_code(data: &String) -> Result<(), Box<dyn Error>> {
+    }*/
+    /*fn generate_qr_code(data: &String) -> Result<(), Box<dyn Error>> {
         let qr_code = QrCode::with_error_correction_level(data, EcLevel::L)?;
         let image = qr_code.render::<image::Luma<u8>>().build();
         image.save("/tmp/qrcode.png")?;
         Ok(())
-    }
+    }*/
 }

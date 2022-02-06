@@ -1,22 +1,24 @@
+extern crate qrcodegen;
+
 use adw::prelude::AdwApplicationWindowExt;
 use adw::prelude::*;
 use adw::{ApplicationWindow, HeaderBar};
 use dgc::DgcContainer;
+use gio::ListModel;
 use gtk::glib::BindingFlags;
 use gtk::prelude::{BoxExt, ButtonExt, GtkWindowExt, ObjectExt, OrientableExt, ToggleButtonExt};
-use gtk::{Application, Button, Image, Orientation};
-use qrcode::{EcLevel, QrCode};
+use gtk::{Application, Button, Image, Orientation, ResponseType};
 use relm4::{
     adw,
-    factory::{positions::StackPageInfo, FactoryPrototype, FactoryVec},
+    factory::{FactoryPrototype, FactoryVec},
     gtk, send, AppUpdate, Model, RelmApp, Sender, WidgetPlus, Widgets,
 };
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{error::Error, fs::read_to_string};
 
 mod cert;
 mod pub_keys;
+mod qr_code;
 
 #[derive(Debug)]
 struct CertificateEntry {
@@ -32,8 +34,9 @@ struct CertificateWidgets {
 }
 
 impl CertificateWidgets {
-    // Update widgets to new time
-    fn update(&self) {}
+    fn update(&self) {
+        // Update qr code if a "better" one was added
+    }
 }
 
 impl FactoryPrototype for CertificateEntry {
@@ -43,40 +46,38 @@ impl FactoryPrototype for CertificateEntry {
     type View = adw::Leaflet;
     type Msg = AppMsg;
 
-    fn init_view(&self, _key: &usize, _sender: Sender<AppMsg>) -> Self::Widgets {
+    fn init_view(&self, _key: &usize, sender: Sender<AppMsg>) -> Self::Widgets {
         // Create widgets.
         let root = adw::Leaflet::new();
-
         let button_qr = gtk::Button::new();
         let vbox_cert = gtk::Box::new(Orientation::Vertical, 0);
-
-        generate_qr_code(&self.certificate);
-        let qr_png = Image::from_file("/tmp/qrcode.png");
+        let qr = crate::qr_code::QRString::new(&self.certificate);
+        let text_view = gtk4::TextView::new();
+        if let Ok(qr_string) = qr {
+            text_view.buffer().set_text(&qr_string.to_string());
+            text_view.set_monospace(true);
+        }
         let squeezer = adw::Squeezer::new();
-        let label_full_name = gtk::Label::new(Some(&self.firstname));
-        let label_short_name = gtk::Label::new(Some(&self.full_name));
+        let label_full_name = gtk::Label::new(Some(&self.full_name));
+        let label_short_name = gtk::Label::new(Some(&self.firstname));
 
-        qr_png.set_vexpand(true);
-        qr_png.set_hexpand(true);
-        qr_png.set_margin_top(4);
-        qr_png.set_margin_bottom(4);
-        qr_png.set_margin_start(4);
-        qr_png.set_margin_end(4);
         label_short_name.set_hexpand(true);
         label_full_name.set_hexpand(true);
 
         squeezer.add(&label_full_name);
         squeezer.add(&label_short_name);
-        vbox_cert.append(&qr_png);
+        vbox_cert.append(&text_view);
         vbox_cert.append(&squeezer);
         button_qr.set_child(Some(&vbox_cert));
         root.append(&button_qr);
 
         // Connect to "clicked" signal of `button`
-        let firstname_clone: String = self.firstname.clone();
+        let full_name_clone: String = self.full_name.clone();
         button_qr.connect_clicked(move |_| {
-            println!("Pushed qr for {}", firstname_clone);
+            send!(sender, AppMsg::Clicked(full_name_clone.clone()));
         });
+
+        button_qr.set_class_active("verified", true);
 
         let widgets = CertificateWidgets {
             root,
@@ -99,9 +100,27 @@ impl FactoryPrototype for CertificateEntry {
 }
 
 struct AppModel {
-    calendar_entries: FactoryVec<CertificateEntry>,
+    certificate_entries: FactoryVec<CertificateEntry>,
+    /*first_name:
+    last_name:
+    std_first_name:
+    std_last_name:
+    birthdate:
+    disease:
+    vaccine:
+    vaccine_type:
+    vaccine_manufacturer:
+    no_dose:
+    no_doses_needed:
+    vaccination_date:
+    vaccination_country:
+    certificate_issuer:
+    certificate_id:
+    certificate_expiry_date:*/
     certificates: HashMap<String, DgcContainer>,
     trust_list: dgc::TrustList,
+    display_page: AppPage,
+    toast: Option<adw::Toast>,
 }
 
 impl AppModel {
@@ -110,10 +129,14 @@ impl AppModel {
         let certificates = HashMap::new();
         // We create a new Trustlist (container of "trusted" public keys)
         let trust_list = dgc::TrustList::default();
+        let display_page = AppPage::Start;
+        let toast = None;
         let mut app_model = Self {
-            calendar_entries,
+            certificate_entries: calendar_entries,
             certificates,
             trust_list,
+            display_page,
+            toast,
         };
         app_model.load_trust_list();
         app_model
@@ -161,22 +184,54 @@ impl AppModel {
             certificate: String::from(raw_cert_data),
         };
         self.certificates.insert(full_name, certificate_container);
-        self.calendar_entries.push(certificate_entry);
+        self.certificate_entries.push(certificate_entry);
         Ok(())
+    }
+
+    fn throw_toast(&mut self, toast_type: ToastType) {
+        let toast = match toast_type {
+            ToastType::Success => adw::Toast::new("Certificate was added!"),
+            ToastType::FileInvalid => {
+                adw::Toast::new("Selected path is invalid. Adding certificate failed!")
+            }
+            ToastType::CertInvalid => adw::Toast::new(
+                "File does not contain a valid certificate. Adding certificate failed!",
+            ),
+            ToastType::QrPNGInvalid => {
+                adw::Toast::new("File does not contain valid QR code. Adding certificate failed!")
+            }
+            ToastType::Aborted => adw::Toast::new("No certificate was added!"),
+        };
+        self.toast = Some(toast);
     }
 }
 
-fn generate_qr_code(data: &str) -> Result<(), Box<dyn Error>> {
-    let qr_code = QrCode::with_error_correction_level(data, EcLevel::L)?;
-    let image = qr_code.render::<image::Luma<u8>>().build();
-    image.save("/tmp/qrcode.png")?;
-    Ok(())
+#[derive(Debug)]
+enum AppPage {
+    CertSelector,
+    Start,
+    Details,
+    Certificate,
+}
+
+impl AppPage {
+    fn to_str(&self) -> &'static str {
+        match self {
+            AppPage::CertSelector => "cert_selector",
+            AppPage::Start => "start",
+            AppPage::Details => "details",
+            AppPage::Certificate => "cert",
+        }
+    }
 }
 
 enum AppMsg {
     Update,
     Delete,
-    AddCertificate,
+    ShowPage(AppPage),
+    TrowToast(ToastType),
+    AddCertificate(std::path::PathBuf),
+    Clicked(String),
 }
 
 impl Model for AppModel {
@@ -186,21 +241,39 @@ impl Model for AppModel {
 }
 
 impl AppUpdate for AppModel {
-    fn update(&mut self, msg: AppMsg, _components: &(), _sender: Sender<AppMsg>) -> bool {
+    fn update(&mut self, msg: AppMsg, _components: &(), sender: Sender<AppMsg>) -> bool {
         match msg {
             AppMsg::Update => {
                 // Check all entries
-                for i in 0..self.calendar_entries.len() {}
+                for i in 0..self.certificate_entries.len() {}
+            }
+            AppMsg::TrowToast(toast_type) => {
+                self.throw_toast(toast_type);
+                self.toast = None;
             }
             AppMsg::Delete => {
-                // Check all entries
-                println!("Calendar entries before: {:?}", self.calendar_entries);
-                self.calendar_entries.clear();
+                // Delete all entries
+                self.certificate_entries.clear();
                 println!("Calendar entries cleared");
-                println!("Calendar entries after: {:?}", self.calendar_entries);
             }
-            AppMsg::AddCertificate => {
-                println!("AddCertificate");
+            AppMsg::AddCertificate(path) => {
+                println!("Add certificate from path: {:?}", path);
+                let raw_certificate_data = read_to_string(path).unwrap();
+                let result = self.add_certificate(&raw_certificate_data);
+                send!(sender, AppMsg::ShowPage(AppPage::Start));
+                if result.is_ok() {
+                    send!(sender, AppMsg::TrowToast(ToastType::Success));
+                } else {
+                    send!(sender, AppMsg::TrowToast(ToastType::FileInvalid));
+                }
+            }
+            AppMsg::Clicked(full_name) => {
+                println!("Button for {} was clicked", full_name);
+            }
+            AppMsg::ShowPage(page) => {
+                //self.view_stack;
+                println!("Change to the page {:?} was requested", page);
+                self.display_page = page;
             }
         }
         true
@@ -223,27 +296,61 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                 },
                 append = &adw::ToastOverlay {
+                    // add_toast: track!(model.toast.is_some(),&model.toast.as_ref().unwrap()),
                     set_child: view_stack = Some(&adw::ViewStack) {
-                        add_named(Some("start_page")) = &gtk::Box {
+                        set_visible_child_name: watch!{model.display_page.to_str()},
+                        add_named(Some(AppPage::Start.to_str())) = &gtk::Box {
                             set_orientation: gtk::Orientation::Vertical,
                             append: main_view = &adw::Leaflet {
-                                factory!(model.calendar_entries)
+                                factory!(model.certificate_entries)
                             },
-                            append = &gtk::Button {
-                                set_label: "+",
+                            append = &gtk::Button::with_label("+") {
                                 set_margin_all: 5,
                                 connect_clicked(sender) => move |_| {
-                                    send!(sender, AppMsg::AddCertificate);
+                                    send!(sender, AppMsg::ShowPage(AppPage::CertSelector));
                                 },
                             },
                         },
-                        add_named(Some("detail_page")) = &gtk::Box {
+                        add_named(Some(AppPage::Details.to_str())) = &gtk::Box {
                             set_orientation: gtk::Orientation::Vertical,
                             append = &gtk::Label {
                                 set_margin_all: 5,
                                // set_label: watch! { &format!("Counter: {}", model.counter) },
                             }
-                        }
+                        },
+                        add_named(Some(AppPage::Certificate.to_str())) = &gtk::Box {
+                            set_orientation: gtk::Orientation::Vertical,
+                            append = &gtk::Label {
+                                set_margin_all: 5,
+                               // set_label: watch! { &format!("Counter: {}", model.counter) },
+                            }
+                        },
+                        add_named(Some(AppPage::CertSelector.to_str())) : file_chooser_box = &gtk::Box {
+                            set_orientation: gtk::Orientation::Vertical,
+                            append: file_chooser = &gtk::FileChooserWidget{
+                                set_action: gtk::FileChooserAction::Open,
+                            },
+                            append: select_file_button = &gtk::Button::with_label("Add") {
+                                set_margin_all: 5,
+                                connect_clicked(sender, file_chooser) => move |_| {
+                                    if let Some(selected_file) = file_chooser.file() {
+                                        if let Some(path) = selected_file.path() {
+                                            send!(sender, AppMsg::AddCertificate(path));
+                                        } else {
+                                            // No path returned -> throw Toast
+                                        }
+                                    } else {
+                                        // No file selected -> throw Toast
+                                    }
+                                },
+                            },
+                            append: cancel_file_button = &gtk::Button::with_label("Cancel") {
+                                set_margin_all: 5,
+                                connect_clicked(sender) => move |_| {
+                                    send!(sender, AppMsg::ShowPage(AppPage::Start));
+                                },
+                            },
+                        },
                     },
                 },
                 append = &gtk::Button {
@@ -259,54 +366,10 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
     // Connect properties and start update thread.
     fn post_init() {
-        /*
-                let givenname = String::from("GivenName");
-                let full_name = String::from("FullName");
-
-                let qr_png = gtk::Image::from_file("/tmp/qrcode.png");
-                qr_png.set_vexpand(true);
-                qr_png.set_hexpand(true);
-                qr_png.set_margin_top(4);
-                qr_png.set_margin_bottom(4);
-                qr_png.set_margin_start(4);
-                qr_png.set_margin_end(4);
-
-                let label_short_name = gtk::Label::new(Some(&givenname));
-                let label_full_name = gtk::Label::new(Some(&full_name));
-
-                label_short_name.set_hexpand(true);
-                label_full_name.set_hexpand(true);
-
-                let squeezer = adw::Squeezer::new();
-                squeezer.add(&label_full_name);
-                squeezer.add(&label_short_name);
-
-                let vbox_cert = gtk::Box::new(Orientation::Vertical, 0);
-                vbox_cert.append(&qr_png);
-                vbox_cert.append(&squeezer);
-
-                let button_qr = gtk::Button::new();
-                button_qr.set_child(Some(&vbox_cert));
-
-                leaflet.append(&button_qr);
-
-                // Connect to "clicked" signal of `button`
-                let view_stack_clone = view_stack.clone();
-                let givenname_clone: String = givenname.into();
-                button_qr.connect_clicked(move |_| {
-                    println!("Pushed qr for {}", givenname_clone);
-                    println!(
-                        "Currently visible: {}",
-                        view_stack_clone.visible_child_name().unwrap()
-                    );
-                    view_stack_clone.set_visible_child_name("detail_page");
-                });
-        */
-
-        //main_view.set_visible_child_name(&model.start_page.to_string());
+        relm4::set_global_css(b".verified { background: #014FBE; }");
 
         std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            std::thread::sleep(std::time::Duration::from_secs(21600)); // 6 hrs
             send!(sender, AppMsg::Update);
         });
     }
@@ -328,3 +391,38 @@ fn main() {
     );
     app.run();
 }
+
+enum ToastType {
+    Success,
+    FileInvalid,
+    CertInvalid,
+    QrPNGInvalid,
+    Aborted,
+}
+
+/*
+
+fn handle_file_chooser_response(&self, response: gtk::ResponseType) {
+        if response == gtk::ResponseType::Accept {
+            if let Some(file) = self.file_chooser.file() {
+                if let Some(path) = file.path() {
+                    if let Ok(((first_name, surname, full_name), cert)) =
+                        self.certificate_store.add_certificate(&path)
+                    {
+                        self.add_qr_png(&first_name, &full_name);
+                        throw_toast(ToastType::Success(first_name), &self.toast_overlay);
+                    } else {
+                        throw_toast(ToastType::CertInvalid, &self.toast_overlay);
+                    }
+                } else {
+                    throw_toast(ToastType::FileInvalid, &self.toast_overlay);
+                }
+            } else {
+                throw_toast(ToastType::FileInvalid, &self.toast_overlay);
+            }
+        } else {
+            throw_toast(ToastType::Aborted, &self.toast_overlay);
+        }
+    }
+
+*/
