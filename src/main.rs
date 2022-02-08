@@ -78,6 +78,7 @@ impl FactoryPrototype for CertificateEntry {
         });
 
         button_qr.set_class_active("verified", true);
+        text_view.set_class_active("qr_code_text", true);
 
         let widgets = CertificateWidgets {
             root,
@@ -366,7 +367,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
     // Connect properties and start update thread.
     fn post_init() {
-        relm4::set_global_css(b".verified { background: #014FBE; }");
+        relm4::set_global_css(
+            b".verified { background: #014FBE;}
+        .qr_code_text { font-size: 3px;}
+        ",
+        );
+        // qr_code_text
 
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(21600)); // 6 hrs
