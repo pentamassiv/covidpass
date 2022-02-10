@@ -14,6 +14,8 @@ use relm4::{
     gtk, send, AppUpdate, Model, RelmApp, Sender, WidgetPlus, Widgets,
 };
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::{error::Error, fs::read_to_string};
 
 mod cert;
@@ -51,12 +53,19 @@ impl FactoryPrototype for CertificateEntry {
         let root = adw::Leaflet::new();
         let button_qr = gtk::Button::new();
         let vbox_cert = gtk::Box::new(Orientation::Vertical, 0);
-        let qr = crate::qr_code::QRString::new(&self.certificate);
-        let text_view = gtk4::TextView::new();
-        if let Ok(qr_string) = qr {
-            text_view.buffer().set_text(&qr_string.to_string());
-            text_view.set_monospace(true);
-        }
+        let qr = crate::qr_code::QRString::new(&self.certificate).unwrap();
+
+        let mut buffer = File::create("/tmp/qrcode.svg").unwrap();
+        //buffer.write_all(&qr.to_svg_string(4));
+        write!(buffer, "{}", qr.to_svg_string(4));
+        let qr_png = Image::from_file("/tmp/qrcode.svg");
+        qr_png.set_vexpand(true);
+        qr_png.set_hexpand(true);
+        qr_png.set_margin_top(4);
+        qr_png.set_margin_bottom(4);
+        qr_png.set_margin_start(4);
+        qr_png.set_margin_end(4);
+
         let squeezer = adw::Squeezer::new();
         let label_full_name = gtk::Label::new(Some(&self.full_name));
         let label_short_name = gtk::Label::new(Some(&self.firstname));
@@ -66,7 +75,7 @@ impl FactoryPrototype for CertificateEntry {
 
         squeezer.add(&label_full_name);
         squeezer.add(&label_short_name);
-        vbox_cert.append(&text_view);
+        vbox_cert.append(&qr_png);
         vbox_cert.append(&squeezer);
         button_qr.set_child(Some(&vbox_cert));
         root.append(&button_qr);
@@ -78,7 +87,7 @@ impl FactoryPrototype for CertificateEntry {
         });
 
         button_qr.set_class_active("verified", true);
-        text_view.set_class_active("qr_code_text", true);
+        // text_view.set_class_active("qr_code_text", true);
 
         let widgets = CertificateWidgets {
             root,
@@ -369,7 +378,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
     fn post_init() {
         relm4::set_global_css(
             b".verified { background: #014FBE;}
-        .qr_code_text { font-size: 3px;}
+        .qr_code_text { font: Monospace 3;}
         ",
         );
         // qr_code_text
