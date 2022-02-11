@@ -4,7 +4,6 @@ use adw::prelude::AdwApplicationWindowExt;
 use adw::prelude::*;
 use adw::{ApplicationWindow, HeaderBar};
 use dgc::DgcContainer;
-use gio::ListModel;
 use gtk::glib::BindingFlags;
 use gtk::prelude::{BoxExt, ButtonExt, GtkWindowExt, ObjectExt, OrientableExt, ToggleButtonExt};
 use gtk::{Application, Button, Image, Orientation, ResponseType};
@@ -14,8 +13,6 @@ use relm4::{
     gtk, send, AppUpdate, Model, RelmApp, Sender, WidgetPlus, Widgets,
 };
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
 use std::{error::Error, fs::read_to_string};
 
 mod cert;
@@ -27,6 +24,7 @@ struct CertificateEntry {
     firstname: String,
     full_name: String,
     certificate: String,
+    signature_validity: dgc::SignatureValidity,
 }
 
 #[derive(Debug)]
@@ -54,11 +52,9 @@ impl FactoryPrototype for CertificateEntry {
         let button_qr = gtk::Button::new();
         let vbox_cert = gtk::Box::new(Orientation::Vertical, 0);
         let qr = crate::qr_code::QRString::new(&self.certificate).unwrap();
+        qr.write_svg("/tmp/qrcode.svg");
 
-        let mut buffer = File::create("/tmp/qrcode.svg").unwrap();
-        //buffer.write_all(&qr.to_svg_string(4));
-        write!(buffer, "{}", qr.to_svg_string(4));
-        let qr_png = Image::from_file("/tmp/qrcode.svg");
+        let qr_png = gtk::Image::from_file("/tmp/qrcode.svg");
         qr_png.set_vexpand(true);
         qr_png.set_hexpand(true);
         qr_png.set_margin_top(4);
@@ -86,8 +82,16 @@ impl FactoryPrototype for CertificateEntry {
             send!(sender, AppMsg::Clicked(full_name_clone.clone()));
         });
 
-        button_qr.set_class_active("verified", true);
-        // text_view.set_class_active("qr_code_text", true);
+        // Checks the validity of the signature
+        match &self.signature_validity {
+            dgc::SignatureValidity::Valid => {
+                button_qr.set_class_active("verified", true);
+            }
+            e => {
+                println!("Could not validate the signature: {}", e);
+                button_qr.set_class_active("unverified", true);
+            }
+        }
 
         let widgets = CertificateWidgets {
             root,
@@ -169,18 +173,9 @@ impl AppModel {
         let (mut certificate_container, signature_validity) =
             dgc::validate(raw_cert_data, &self.trust_list).expect("Cannot parse certificate data");
 
-        println!("{:#?}", &certificate_container);
-
-        // Checks the validity of the signature
-        match signature_validity {
-            dgc::SignatureValidity::Valid => println!("The certificate signature is Valid!"),
-            e => println!("Could not validate the signature: {}", e),
-        }
-
         // you can call `expand_values()` to resolve all the IDs against a well known valueset embedded in the library
         certificate_container.expand_values();
 
-        println! {"{:?}",certificate_container};
         let dgc_name = certificate_container.certs.get(&1).unwrap();
         let firstname = dgc_name.name.forename.clone().unwrap_or("".into());
         let surname = dgc_name.name.surname.clone().unwrap_or("".into());
@@ -192,6 +187,7 @@ impl AppModel {
             firstname,
             full_name: full_name.clone(),
             certificate: String::from(raw_cert_data),
+            signature_validity,
         };
         self.certificates.insert(full_name, certificate_container);
         self.certificate_entries.push(certificate_entry);
@@ -378,10 +374,9 @@ impl Widgets<AppModel, ()> for AppWidgets {
     fn post_init() {
         relm4::set_global_css(
             b".verified { background: #014FBE;}
-        .qr_code_text { font: Monospace 3;}
+        .unverified { background: #D61D21;}
         ",
         );
-        // qr_code_text
 
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(21600)); // 6 hrs
@@ -395,15 +390,6 @@ fn main() {
     let raw_certificate_data = read_to_string("../HealthCertificates/covCert.txt").unwrap();
     app_model.add_certificate(&raw_certificate_data);
     let app = RelmApp::new(app_model);
-
-    // Style the verse labels
-    relm4::set_global_css(
-        b"\
-        .verse { \
-            font-weight: bold; \
-            font-size: 1.4em; \
-        }",
-    );
     app.run();
 }
 

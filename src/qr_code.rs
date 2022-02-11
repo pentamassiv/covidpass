@@ -1,7 +1,11 @@
 use qrcodegen::{QrCode, QrCodeEcc};
+use std::fs::File;
+use std::io::Write;
 
+/*
 static BLACK_QR: &'static str = "██";
 static WHITE_QR: &'static str = "  ";
+*/
 
 pub struct QRString {
     qr_code: QrCode,
@@ -20,7 +24,7 @@ impl QRString {
     // Returns a string of SVG code for an image depicting
     // the given QR Code, with the given number of border modules.
     // The string always uses Unix newlines (\n), regardless of the platform.
-    pub fn to_svg_string(&self, border: i32) -> String {
+    fn to_svg_string(&self, border: i32) -> String {
         assert!(border >= 0, "Border must be non-negative");
         let mut result = String::new();
         result += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -48,8 +52,13 @@ impl QRString {
         result += "</svg>\n";
         result
     }
+    pub fn write_svg(&self, path: &str) {
+        let mut buffer = File::create(path).unwrap();
+        write!(buffer, "{}", self.to_svg_string(4));
+    }
 }
 
+/*
 // Allows converting the QR code to a String to print it
 impl std::fmt::Display for QRString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -69,3 +78,4 @@ impl std::fmt::Display for QRString {
         write!(f, "{}", result)
     }
 }
+*/
