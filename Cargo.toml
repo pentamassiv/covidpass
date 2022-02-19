@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 dgc = "0.0"
 qrcodegen = "1.7"
-image = "0.24"
 relm4 = { version = "0.4", features = ["libadwaita", "macros"] }
 relm4-components = "0.4"
 relm4-macros = "0.4"
