@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 dgc = "0.0"
-qrcode = "0.12"
-image = "0.23.14"
+qrcodegen = "1.7"
+relm4 = { version = "0.4", features = ["libadwaita", "macros"] }
+relm4-components = "0.4"
+relm4-macros = "0.4"
 libadwaita = "0.1"
 gtk4 = "0.4"
 curl = "0.4"
