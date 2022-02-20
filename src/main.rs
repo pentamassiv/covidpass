@@ -26,7 +26,6 @@ struct CertificateEntry {
 #[derive(Debug)]
 struct CertificateWidgets {
     root: adw::Leaflet,
-    active: gtk::Button,
 }
 
 impl CertificateWidgets {
@@ -89,10 +88,7 @@ impl FactoryPrototype for CertificateEntry {
             }
         }
 
-        let widgets = CertificateWidgets {
-            root,
-            active: button_qr,
-        };
+        let widgets = CertificateWidgets { root };
         widgets.update();
 
         widgets
