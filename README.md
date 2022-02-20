@@ -5,5 +5,5 @@ This application can store and validate vaccination certificates from the EU. It
 
 ## TODO
 - [ ] Write the GUI
-- [ ] Add a way to validate certificates
+- [ ] Not only validate certificates but also check the business rules of countries (see https://github.com/rust-italia/dgc/issues/19)
 - [ ] Allow scanning QR codes to add certificates
