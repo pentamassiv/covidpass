@@ -1,23 +1,19 @@
-extern crate qrcodegen;
-
 use adw::prelude::AdwApplicationWindowExt;
-use adw::prelude::*;
-use adw::{ApplicationWindow, HeaderBar};
-use dgc::DgcContainer;
-use gtk::glib::BindingFlags;
-use gtk::prelude::{BoxExt, ButtonExt, GtkWindowExt, ObjectExt, OrientableExt, ToggleButtonExt};
-use gtk::{Application, Button, Image, Orientation, ResponseType};
+use gtk::prelude::{
+    BoxExt, ButtonExt, FileChooserExt, FileExt, GtkWindowExt, OrientableExt, WidgetExt,
+};
+use gtk::Orientation;
 use relm4::{
     adw,
     factory::{FactoryPrototype, FactoryVec},
     gtk, send, AppUpdate, Model, RelmApp, Sender, WidgetPlus, Widgets,
 };
-use std::collections::HashMap;
-use std::{error::Error, fs::read_to_string};
+use std::{fs::read_to_string, path::PathBuf};
 
 mod cert;
 mod pub_keys;
 mod qr_code;
+mod read_ops;
 
 #[derive(Debug)]
 struct CertificateEntry {
@@ -102,7 +98,9 @@ impl FactoryPrototype for CertificateEntry {
         widgets
     }
 
-    fn position(&self, key: &usize) -> () {}
+    fn position(&self, key: &usize) -> () {
+        // TODO: Sort the QR-codes alphabetically??
+    }
 
     fn view(&self, _key: &usize, widgets: &CertificateWidgets) {
         widgets.update();
@@ -131,8 +129,7 @@ struct AppModel {
     certificate_issuer:
     certificate_id:
     certificate_expiry_date:*/
-    certificates: HashMap<String, DgcContainer>,
-    trust_list: dgc::TrustList,
+    certificate_store: crate::cert::CertificateStore,
     display_page: AppPage,
     toast: Option<adw::Toast>,
 }
@@ -140,58 +137,17 @@ struct AppModel {
 impl AppModel {
     pub fn new() -> Self {
         let calendar_entries = FactoryVec::new();
-        let certificates = HashMap::new();
-        // We create a new Trustlist (container of "trusted" public keys)
-        let trust_list = dgc::TrustList::default();
+        let certificate_store = crate::cert::CertificateStore::new();
         let display_page = AppPage::Start;
         let toast = None;
         let mut app_model = Self {
             certificate_entries: calendar_entries,
-            certificates,
-            trust_list,
+            certificate_store,
             display_page,
             toast,
         };
-        app_model.load_trust_list();
+        app_model.certificate_store.load_trust_list();
         app_model
-    }
-
-    pub fn load_trust_list(&mut self) -> Result<(), Box<dyn Error>> {
-        let pub_keys = crate::pub_keys::read_file("trust_list.txt");
-
-        for key in pub_keys {
-            // We add the public key in the certificate to the trustlist
-            self.trust_list
-                .add_key_from_certificate(&key)
-                .expect("Failed to add key from certificate");
-        }
-        Ok(())
-    }
-
-    pub fn add_certificate(&mut self, raw_cert_data: &str) -> Result<(), Box<dyn Error>> {
-        // Now we can validate the signature (this returns)
-        let (mut certificate_container, signature_validity) =
-            dgc::validate(raw_cert_data, &self.trust_list).expect("Cannot parse certificate data");
-
-        // you can call `expand_values()` to resolve all the IDs against a well known valueset embedded in the library
-        certificate_container.expand_values();
-
-        let dgc_name = certificate_container.certs.get(&1).unwrap();
-        let firstname = dgc_name.name.forename.clone().unwrap_or("".into());
-        let surname = dgc_name.name.surname.clone().unwrap_or("".into());
-        let mut full_name = firstname.clone();
-        full_name.push_str(" ");
-        full_name.push_str(&surname);
-
-        let certificate_entry = CertificateEntry {
-            firstname,
-            full_name: full_name.clone(),
-            certificate: String::from(raw_cert_data),
-            signature_validity,
-        };
-        self.certificates.insert(full_name, certificate_container);
-        self.certificate_entries.push(certificate_entry);
-        Ok(())
     }
 
     fn throw_toast(&mut self, toast_type: ToastType) {
@@ -264,10 +220,22 @@ impl AppUpdate for AppModel {
             }
             AppMsg::AddCertificate(path) => {
                 println!("Add certificate from path: {:?}", path);
-                let raw_certificate_data = read_to_string(path).unwrap();
-                let result = self.add_certificate(&raw_certificate_data);
+                let raw_certificate_string = read_to_string(path).unwrap();
+                let result = self
+                    .certificate_store
+                    .add_certificate(&raw_certificate_string);
+                let raw_certificate_string_owned = String::from(raw_certificate_string);
                 send!(sender, AppMsg::ShowPage(AppPage::Start));
-                if result.is_ok() {
+
+                if let Ok((firstname, full_name, signature_validity)) = result {
+                    let certificate_entry = CertificateEntry {
+                        firstname,
+                        full_name,
+                        certificate: raw_certificate_string_owned,
+                        signature_validity,
+                    };
+                    self.certificate_entries.push(certificate_entry);
+
                     send!(sender, AppMsg::TrowToast(ToastType::Success));
                 } else {
                     send!(sender, AppMsg::TrowToast(ToastType::FileInvalid));
@@ -370,25 +338,28 @@ impl Widgets<AppModel, ()> for AppWidgets {
         }
     }
 
-    // Connect properties and start update thread.
+    // Connect properties, start update thread and load added certificates.
     fn post_init() {
         relm4::set_global_css(
             b".verified { background: #014FBE;}
         .unverified { background: #D61D21;}
         ",
         );
-
+        let sender_clone = sender.clone();
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(21600)); // 6 hrs
-            send!(sender, AppMsg::Update);
+            send!(sender_clone, AppMsg::Update);
         });
+
+        send!(
+            sender,
+            AppMsg::AddCertificate(PathBuf::from("../HealthCertificates/covCert.txt"))
+        );
     }
 }
 
 fn main() {
-    let mut app_model = AppModel::new();
-    let raw_certificate_data = read_to_string("../HealthCertificates/covCert.txt").unwrap();
-    app_model.add_certificate(&raw_certificate_data);
+    let app_model = AppModel::new();
     let app = RelmApp::new(app_model);
     app.run();
 }
